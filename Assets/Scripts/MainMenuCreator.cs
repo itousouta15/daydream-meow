@@ -62,6 +62,13 @@ public class MainMenuCreator : MonoBehaviour
                         rb.simulated = false;
                 }
             }
+
+            // 如果場景有 LevelGenerator，暫停它的生成與滾動
+            var lg = Object.FindAnyObjectByType<LevelGenerator>();
+            if (lg != null)
+            {
+                lg.paused = true;
+            }
         }
     }
 
@@ -112,25 +119,16 @@ public class MainMenuCreator : MonoBehaviour
         titleRT.anchoredPosition = new Vector2(0, -10);
         titleRT.sizeDelta = new Vector2(0, 40);
 
-        // 按鈕：回到遊戲（關閉主選單）
-        GameObject btnResume = CreateButton("ResumeButton", "返回遊戲", new Vector2(0, -30));
+        // 按鈕：回到遊戲（按住兩秒才回到遊戲）
+        GameObject btnResume = CreateButton("ResumeButton", "返回遊戲 (按住2秒)", new Vector2(0, -30));
         btnResume.transform.SetParent(menuGO.transform, false);
-        btnResume.GetComponent<Button>().onClick.AddListener(() => {
-            // 隱藏 Canvas 並恢復時間
-            canvas.gameObject.SetActive(false);
-            Time.timeScale = 1f;
-            // 如果 player 被停用，重新啟用
-            GameObject player = GameObject.FindGameObjectWithTag(playerTag);
-            if (player != null)
-            {
-                var pc = player.GetComponent<PlayerController>();
-                if (pc != null)
-                    pc.enabled = true;
-                var rb = player.GetComponent<Rigidbody2D>();
-                if (rb != null)
-                    rb.simulated = true;
-            }
-        });
+        // 改用 HoldToStart 元件：按住一段時間才會關閉選單並恢復遊戲
+        var hold = btnResume.AddComponent<HoldToStart>();
+        hold.holdTime = 2f;
+        hold.menuCanvas = canvas;
+        hold.playerTag = playerTag;
+        // 讓 LevelGenerator 在按住完成後開始（不額外延遲）
+    hold.levelGen = Object.FindAnyObjectByType<LevelGenerator>();
 
         // 按鈕：返回主選單場景（如果有實作）
         GameObject btnQuit = CreateButton("QuitButton", "離開到主選單", new Vector2(0, -90));
@@ -178,6 +176,13 @@ public class MainMenuCreator : MonoBehaviour
             var rb = player.GetComponent<Rigidbody2D>();
             if (rb != null)
                 rb.simulated = true;
+        }
+
+        // 如果場景有 LevelGenerator，延遲 0.5 秒再讓它開始生成/滾動
+        var levelGen = Object.FindAnyObjectByType<LevelGenerator>();
+        if (levelGen != null)
+        {
+            levelGen.ResumeAfterDelay(0.5f);
         }
     }
 
