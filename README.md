@@ -6,4 +6,5 @@
 
 ---
 
-Make By 伊藤蒼太,GitHub Copilot,有栖
+Made By 伊藤蒼太,GitHub Copilot,有栖
+
