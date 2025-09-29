@@ -3,21 +3,19 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-// 按住按鈕一段時間後觸發開始行為（使用 realtime / unscaled time）
 public class HoldToStart : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
 {
-    public float holdTime = 2f; // required seconds to hold
-    public Canvas menuCanvas; // the main menu canvas to hide
+    public float holdTime = 2f;
+    public Canvas menuCanvas;
     public string playerTag = "Player";
-    public LevelGenerator levelGen; // optional reference
-    public Image fillImage; // optional visual fill (Image type, should be filled)
+    public LevelGenerator levelGen;
+    public Image fillImage;
 
     private bool pressing = false;
     private float timer = 0f;
 
     void Reset()
     {
-        // default for convenience when added in editor
         holdTime = 2f;
     }
 
@@ -51,7 +49,6 @@ public class HoldToStart : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        // cancel when pointer leaves the button
         pressing = false;
         timer = 0f;
         if (fillImage != null) fillImage.fillAmount = 0f;
@@ -59,13 +56,11 @@ public class HoldToStart : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
 
     void OnHoldComplete()
     {
-        // Hide menu and resume game
         if (menuCanvas != null)
             menuCanvas.gameObject.SetActive(false);
 
         Time.timeScale = 1f;
 
-        // enable player control and physics if player exists
         GameObject player = null;
         try { player = GameObject.FindGameObjectWithTag(playerTag); } catch { }
         if (player != null)
@@ -85,7 +80,6 @@ public class HoldToStart : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
             levelGen = Object.FindAnyObjectByType<LevelGenerator>();
         if (levelGen != null)
         {
-            // resume immediately
             levelGen.ResumeAfterDelay(0f);
         }
     }

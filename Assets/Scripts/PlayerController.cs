@@ -8,89 +8,63 @@ using System.Collections;
 public class PlayerController : MonoBehaviour
 {
     public float moveSpeed = 20f;
-    // 空中時允許的水平速度（可調整為比地面更快）
     public float airMoveSpeed = 12f;
     private Rigidbody2D rb;
-    // 參考 LevelGenerator，用來判斷場景是否在向上滾動（平台是否會把玩家往上推）
     private LevelGenerator levelGenerator;
-    // horizontal input cached from Update
     private float moveInput = 0f;
-    // 地面時水平加速度（用於快速達到目標速度）
     public float groundAcceleration = 100f;
-    // 空中時水平加速度（較小以避免瞬間改變，減少卡卡感）
     public float airAcceleration = 50f;
-    // 空中按下左右鍵時使用的較高加速度，提高即時反應
     public float airAccelerationInput = 120f;
-    // 空中無輸入時的減速度（平滑回到0）
     public float airDeceleration = 40f;
-    // 當平台把玩家往上推（被帶上）時，使用更大的加速度以提高空中控制
     public float carriedAcceleration = 200f;
-    // 被帶上時允許的水平速度（可比地面更接近地面速度）
     public float carriedMoveSpeed = 10f;
-    // 判定為被帶上的垂直速度閾值（當 rb.velocity.y > pushedUpThreshold 時視為被平台往上推）
     public float pushedUpThreshold = 1.5f;
 
-    // 判斷玩家是否站在平台上
     private bool isOnPlatform = false;
-    // 離開平台後仍維持地面控制的寬限時間（秒），避免瞬間失去控制感
     public float platformControlGrace = 0.35f;
     private float lastOnPlatformTime = -999f;
-    // 玩家可移動的左右邊界內距（世界座標單位）
     public float xPadding = 0.5f;
-    // 指向主選單的 Canvas（在 Inspector 指定）
     public Canvas mainMenuCanvas;
-    // 玩家超出攝影機上界後的緩衝距離（避免誤觸發）
     public float topBuffer = 0.5f;
-    // 生命系統：預設 9 條命，並顯示於 TMP
     public int lives = 9;
     public TMP_Text livesText;
     [Header("Lives Display")]
     public bool useHeartDisplay = true;
     public string lifeSymbol = "❤";
     public string lifeSeparator = " x ";
-    public TMPro.TMP_FontAsset preferredHeartFont; // optional: manually assign a TMP font that supports the heart symbol
+    public TMPro.TMP_FontAsset preferredHeartFont;
     [Header("Heart Images")]
-    public bool useHeartImages = false; // 如果 true 則使用 Image-based 心形顯示
-    public Image heartPrefab; // 在 Canvas 下準備一個 Image prefab (只要拖入一個 Image 元件作為 prefab)
-    public RectTransform heartParent; // UI 容器 (通常一個 Horizontal Layout Group)
-    public int maxHeartInstances = 20; // 上限，避免無限建立
+    public bool useHeartImages = false;
+    public Image heartPrefab;
+    public RectTransform heartParent;
+    public int maxHeartInstances = 20;
     private System.Collections.Generic.List<Image> heartImages = new System.Collections.Generic.List<Image>();
-    // 音效：落地、踩水、死亡、道具碎裂（預設於 Inspector 指定）
     [Header("Audio Clips")]
-    public AudioClip landingSfx; // 落地 Random4.wav
-    public AudioClip waterHitSfx; // 踩水(碰到水扣血)
-    public AudioClip deathSfx; // 天花板(被壓死) Pickup.wav (作為死亡音)
-    // 無敵（扣血後短暫無敵）
+    public AudioClip landingSfx;
+    public AudioClip waterHitSfx;
+    public AudioClip deathSfx;
     public float invulnTime = 1f;
     private float invulnTimer = 0f;
-    // 無敵期間閃爍設定
-    public float flashFrequency = 8f; // 次/秒
+    public float flashFrequency = 8f;
     [Range(0f,1f)]
     public float flashMinAlpha = 0.25f;
     private SpriteRenderer[] spriteRenderers;
     private Sprite[] originalSprites;
     private Color[] originalColors;
     private bool wasInvulnerable = false;
-    // 受傷時臨時替換的 Sprite（例如 受傷貓.png）
     public Sprite injuredSprite;
     private bool isShowingInjured = false;
-    // 死亡時顯示的 Sprite（例如 死掉.png）
     public Sprite deadSprite;
-    // 顯示死亡畫面的實際秒數（使用 realtime，不受 timeScale 影響）
     public float deathShowDuration = 1.0f;
-    // 雨衣狀態：如果有穿雨衣，下一次碰到水池會消耗雨衣而不死亡
     public bool hasRaincoat = false;
-    public Sprite raincoatSprite; // 可在 Inspector 指定替換用的雨衣造型
-    // 是否已經回到主選單，避免重複觸發
+    public Sprite raincoatSprite;
     private bool returnedToMenu = false;
-    // 快取一個 AudioSource 來播放 sfx
     private AudioSource sfxSource;
 
-    void Start() 
+    void Start()
     {
         rb = GetComponent<Rigidbody2D>();
-    levelGenerator = UnityEngine.Object.FindAnyObjectByType<LevelGenerator>();
-        // 建立一個 AudioSource 用於播放 SFX（可被 OneShot），並快取成欄位
+        levelGenerator = UnityEngine.Object.FindAnyObjectByType<LevelGenerator>();
         var s = GetComponent<AudioSource>();
         if (s == null)
         {
@@ -98,11 +72,8 @@ public class PlayerController : MonoBehaviour
             s.playOnAwake = false;
         }
         sfxSource = s;
-        // 鎖定 Rigidbody2D 的旋轉，避免因碰撞或力矩而旋轉角色
-        // 也可以在 Unity Inspector 的 Rigidbody2D component 中勾選 Constraints > Freeze Rotation
         rb.constraints = RigidbodyConstraints2D.FreezeRotation;
 
-        // 嘗試自動尋找 livesText（若尚未由 Inspector 指定）
         if (livesText == null)
         {
             GameObject go = GameObject.Find("LivesText");
@@ -110,7 +81,6 @@ public class PlayerController : MonoBehaviour
                 livesText = go.GetComponent<TMP_Text>();
         }
 
-        // 如果仍未找到，退而求其次地尋找場景中的任一 TMP_Text（注意：可能抓到非生命專用的文字）
         if (livesText == null)
         {
             livesText = UnityEngine.Object.FindAnyObjectByType<TMP_Text>();
@@ -123,14 +93,12 @@ public class PlayerController : MonoBehaviour
             Debug.LogWarning("PlayerController: livesText 尚未指定，生命顯示無法更新。請在 Inspector 指派一個 TextMeshPro 文字元件或建立 GameObject 命名為 'LivesText'.");
         }
 
-        // 如果使用心形顯示，檢查目前所用字型是否含有該字元；若不支援，改回數字顯示以避免方框替代字元
         if (useHeartDisplay && livesText != null && !string.IsNullOrEmpty(lifeSymbol))
         {
             var fontAsset = livesText.font;
             bool hasGlyph = false;
             if (fontAsset != null)
             {
-                // 檢查第一個字元是否存在於字型中
                 char checkChar = lifeSymbol[0];
                 hasGlyph = fontAsset.HasCharacter(checkChar);
             }
@@ -138,7 +106,6 @@ public class PlayerController : MonoBehaviour
             if (!hasGlyph)
             {
                 char checkChar = lifeSymbol[0];
-                // 先檢查是否有指定的 preferredHeartFont
                 if (preferredHeartFont != null && preferredHeartFont.HasCharacter(checkChar))
                 {
                     livesText.font = preferredHeartFont;
@@ -147,7 +114,6 @@ public class PlayerController : MonoBehaviour
                 }
                 else
                 {
-                    // 嘗試在專案中找到支援該字元的 TMP_FontAsset，並自動指派
                     TMPro.TMP_FontAsset[] fonts = Resources.FindObjectsOfTypeAll<TMPro.TMP_FontAsset>();
                     TMPro.TMP_FontAsset found = null;
                     if (fonts != null && fonts.Length > 0)
@@ -178,10 +144,8 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // 初始化生命顯示
         UpdateLivesText();
 
-        // 取得玩家 SpriteRenderer（包含子物件）以便做透明度閃爍效果
         spriteRenderers = GetComponentsInChildren<SpriteRenderer>(true);
         if (spriteRenderers != null && spriteRenderers.Length > 0)
         {
@@ -193,14 +157,12 @@ public class PlayerController : MonoBehaviour
                 originalSprites[i] = spriteRenderers[i].sprite;
             }
 
-            // 嘗試自動指派 raincoatSprite（如果 Inspector 未指定），搜尋專案內已載入的 Sprite
             if (raincoatSprite == null)
             {
                 Sprite[] allSprites = Resources.FindObjectsOfTypeAll<Sprite>();
                 foreach (var sp in allSprites)
                 {
                     if (sp == null) continue;
-                    // 僅比對精確名稱 "雨衣貓"
                     if (sp.name == "雨衣貓")
                     {
                         raincoatSprite = sp;
@@ -210,7 +172,6 @@ public class PlayerController : MonoBehaviour
                 }
                 if (raincoatSprite == null)
                 {
-                    // 嘗試從 Resources 資料夾載入（如果使用者把雨衣圖放在 Assets/Resources 中）
                     Sprite res = Resources.Load<Sprite>("雨衣貓");
                     if (res != null)
                     {
@@ -222,7 +183,6 @@ public class PlayerController : MonoBehaviour
                         Debug.LogWarning("PlayerController: 未找到名為 '雨衣貓' 的 Sprite，請在 Inspector 手動指定 raincoatSprite。\n建議把圖片放到 Assets/Resources/ 並命名為 '雨衣貓.png'，或直接在 Inspector 指定。 ");
                     }
                 }
-                // 嘗試自動指派 deadSprite（若 Inspector 未指定）
                 if (deadSprite == null)
                 {
                     Sprite[] allSprites2 = Resources.FindObjectsOfTypeAll<Sprite>();
@@ -292,7 +252,6 @@ public class PlayerController : MonoBehaviour
 
     void Update() 
     {
-        // 只讀取輸入並快取，實際改變速度在 FixedUpdate 處理（符合物理週期）
         moveInput = 0f;
         var keyboard = Keyboard.current;
 
@@ -303,18 +262,13 @@ public class PlayerController : MonoBehaviour
             else if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
                 moveInput = 1f;
         }
-
-        // 更新無敵計時器
         if (invulnTimer > 0f) invulnTimer -= Time.deltaTime;
-
-        // 處理閃爍效果（若在無敵中）
         if (invulnTimer > 0f)
         {
             wasInvulnerable = true;
             if (spriteRenderers != null)
             {
                 float elapsed = invulnTime - invulnTimer;
-                // 使用正弦函數做平滑閃爍，頻率以 flashFrequency 控制
                 float s = (Mathf.Sin(elapsed * flashFrequency * Mathf.PI * 2f) + 1f) / 2f; // 0..1
                 float alpha = Mathf.Lerp(flashMinAlpha, 1f, s);
                 for (int i = 0; i < spriteRenderers.Length; i++)
@@ -327,7 +281,6 @@ public class PlayerController : MonoBehaviour
         }
         else if (wasInvulnerable)
         {
-            // 無敵結束：還原原本顏色
             wasInvulnerable = false;
             if (spriteRenderers != null)
             {
@@ -483,11 +436,11 @@ public class PlayerController : MonoBehaviour
                     layout.childForceExpandHeight = false;
                     layout.childForceExpandWidth = false;
                     heartParent = rt;
-                    Debug.Log("PlayerController: heartParent 未設定，已自動建立 HeartsContainer under Canvas。");
+                    Debug.Log("PlayerController: heartParent 自動建立 HeartsContainer under Canvas。");
                 }
                 else
                 {
-                    Debug.LogWarning("PlayerController: useHeartImages 為 true，但 heartParent 與 Canvas 均未設定，回退為文字顯示。");
+                    Debug.LogWarning("PlayerController: useHeartImages 為 true，但 heartParent 與 Canvas 未設定，沒救了);
                     useHeartImages = false;
                 }
             }
